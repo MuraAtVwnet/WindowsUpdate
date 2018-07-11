@@ -1,41 +1,69 @@
 ﻿概要
-    Windows Update と再起動を自動実行する
+    Windows Update と再起動を Windows Update が完了するまで自動実行します
+
+    Windows Server 2008 R2 / Windows 7 以降、PowerShell 3.0 以降で使えます
+        (Windows Server 2016 / Windows 10 で動作確認)
 
 スクリプト説明
     AutoWindowsUpdate.ps1
+        自動 Windows Update スクリプト本体
+        更新プログラム適用完了するまで何度も自動再起動
+
         C:\WindowsUpdateに置いて管理権限実行
-        引数に「 Full 」を与えると全ての更新を適用する
-        引数なしだと重要な更新のみを適用する
-        適用完了するまで何度も自動再起動
         C:\WU_Log に実行ログ出力
+
+        引数に「 Full 」を与えると全ての更新を適用します
+        引数なし or 「 Minimum 」を与えると重要な更新のみを適用します
+
+    SetupSchedule-DaylyWU.ps1
+        AutoWindowsUpdate.ps1 を毎日指定時刻に実行するスケジュールを登録します
+
+        引数
+            -StartTime : 開始時刻 HH:MM の 24h 表記
+            -WuOption  : AutoWindowsUpdate.ps1 のオプションと同じ
+
+        例
+            SetupSchedule-DaylyWU.ps1 -StartTime 04:00 -WuOption Full
+            毎日 4:00 AM に Full オプションで AutoWindowsUpdate.ps1 を実行するスケジュールを登録します
+
+    SetupSchedule-MonthlyWU.ps1
+        AutoWindowsUpdate.ps1 を毎月一度 Windows Update 日 + ディレイ日に実行するスケジュールを登録します
+
+        引数
+            -StartTime : 開始時刻 HH:MM の 24h 表記
+            -WuDelay   : Windows Update 日(第2火曜日の翌日)からのディレイ日
+            -WuOption  : AutoWindowsUpdate.ps1 のオプションと同じ
+
+        例
+            SetupSchedule-MonthlyWU.ps1 -StartTime 04:00 -WuDelay 3 -WuOption Full
+            毎月の Windows Update 日から3日経過した 4:00 AM に Full オプションで AutoWindowsUpdate.ps1 を実行するスケジュールを登録します
+
+    GoWU.ps1
+        内部処理用(単独でこのスクリプトを使うことは想定していません)
+        SetupSchedule-MonthlyWU.ps1 がスケジュールに登録するスクリプト
+        毎月の Windows Update 日から引数で指定されたディレイ日であれば AutoWindowsUpdate.ps1 を実行します
 
     SubmitWU.ps1
         補助ツール
-        AutoWindowsUpdate.ps1 を自動起動にセットして reboot する
+        AutoWindowsUpdate.ps1 を自動起動にセットして reboot します
 
         使いどころ
-            いつまでも PowerShell プロンプト開いたままにしたくない
-            リモートコンピューターに WU をかける
+            いつまでも PowerShell プロンプト開いたままにしたくない場合
+            リモートコンピューターに WU をかける場合
 
 補足説明
     Auto 系のスクリプトは、実行ログに "=-=-=-=-=- Windows Update finished -=-=-=-=-=" が出力されるまで放置
-    # そのまま使っていると、予告もなく再起動が入るので危険
+    # そのまま使っていると、予告もなく再起動が入るので危険です
 
-    会話式の更新(Windows Defenderのパターンファイルとか)は適用されないので、最後に手動 Windows Update
-    が必要(短時間で終わる)
+    会話式の更新は適用されないので、必要に応じて手動 Windows Update して下さい(短時間で終わるハズ)
 
-    全ての更新を適用すると、.NET が最新バージョンまで上がるので要注意
-    運用中の AP/TM は重要な更新のみ適用が原則
+    Full オプションで更新を適用すると、.NET が最新バージョンまで上がるので .NET バージョンに依存している環境は要注意です
 
-    UEFI セキュアブート環境(含むWindows Server 2012 R2 Gen 2 VM)だと、KB2962824 問題でロールバックが発
-    生することがある。
-    対策は、BitLocker モジュールをインストールする。(インストールのみ、BitLocker 構成不要)
-
-        Add-WindowsFeature BitLocker -Restart
+    UEFI セキュアブート環境(含むWindows Server 2012 R2 Gen 2 VM)だと、KB2962824 問題でロールバックが発生することがあるので、BitLocker モジュールをインストールします。
+    (インストールのみ、BitLocker 構成はしません)
 
         http://support.microsoft.com/kb/2962824/ja より引用
-        このエラーは、セキュリティ更新プログラム 2962824 のインストーラーが、BitLocker がインストール
-        されていることを誤って予期するために発生します。
+        このエラーは、セキュリティ更新プログラム 2962824 のインストーラーが、BitLocker がインストールされていることを誤って予期するために発生します。
 
 Windows Update が進まない時の対応
 
