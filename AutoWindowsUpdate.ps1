@@ -58,7 +58,7 @@ $G_SetTimeStampFileName = "WU_TimeStamp.txt"
 $G_MaxUpdateNumber = 100
 
 # スクリプトの配置場所
-$C_ScriptDir = Split-Path $MyInvocation.MyCommand.Path -Parent
+$G_ScriptDir = Split-Path $MyInvocation.MyCommand.Path -Parent
 
 $G_LogPath = "C:\WU_Log"
 $G_LogName = "WU_Log.txt"
@@ -74,18 +74,18 @@ function Log(
 	$Log = $Now.ToString("yyyy/MM/dd HH:mm:ss.fff") + " "
 	$Log += $LogString
 
-	if( $LC_LogName -eq $null ){
-		$LC_LogName = "LOG"
+	if( $G_LogName -eq $null ){
+		$G_LogName = "LOG"
 	}
 
-	$LogFile = $LC_LogName + "_" +$Now.ToString("yyyy-MM-dd") + ".log"
+	$LogFile = $G_LogName + "_" +$Now.ToString("yyyy-MM-dd") + ".log"
 
 	# ログフォルダーがなかったら作成
-	if( -not (Test-Path $LC_LogPath) ) {
-		New-Item $LC_LogPath -Type Directory
+	if( -not (Test-Path $G_LogPath) ) {
+		New-Item $G_LogPath -Type Directory
 	}
 
-	$LogFileName = Join-Path $LC_LogPath $LogFile
+	$LogFileName = Join-Path $G_LogPath $LogFile
 
 	Write-Output $Log | Out-File -FilePath $LogFileName -Encoding utf8 -append
 
