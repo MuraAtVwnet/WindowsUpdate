@@ -11,7 +11,7 @@ param (
 ##########################################################################
 function Usage(){
 	echo "Usage..."
-	echo "    RegistSchedule.ps1 StartTime(99:99) WuDelayDate(9) WuOptin( Minimum | Full )"
+	echo "    RegistSchedule.ps1 StartTime(99:99) WuOptin( Minimum | Full )"
 	exit
 }
 
