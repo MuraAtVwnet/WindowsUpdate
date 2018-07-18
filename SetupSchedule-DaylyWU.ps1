@@ -51,10 +51,20 @@ function SetStartTime( $BackupTime ){
 # 管理権限で実行されているか確認
 #######################################################
 function HaveIAdministrativePrivileges(){
-    $WindowsPrincipal = [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
-    $IsRoleStatus = $WindowsPrincipal.IsInRole("Administrators")
-    return $IsRoleStatus
+	$WindowsPrincipal = [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
+	$IsRoleStatus = $WindowsPrincipal.IsInRole("Administrators")
+	return $IsRoleStatus
 }
+
+#######################################################
+# ログ削除時刻
+#######################################################
+function GetLogRemoveStart( $WUTime ){
+	$LogRemoveDateTime = (([datetime]$WUTime).AddHours(-1))
+	$LogRemoveStart = $LogRemoveDateTime.ToString("HH:mm")
+	return $LogRemoveStart
+}
+
 
 #######################################################
 # スケジュール登録
@@ -90,10 +100,27 @@ $Script = "C:\WindowsUpdate\AutoWindowsUpdate.ps1"
 # オプション
 $Option = [string]$WuOption
 
-# スケジュール登録
+# WU スケジュール登録
 EntorySchedule $FullTaskName $Script $StartTime $Option
 
-echo "以下でスケジュール登録しました"
+echo "以下で Windows Update スケジュールを登録しました"
 echo "タスク名   : $FullTaskName"
 echo "開始時刻   : $StartTime"
 echo "オプション : $WuOption"
+echo ""
+
+# Log 削除開始時刻
+$LogRemoveStart = GetLogRemoveStart $StartTime
+
+# タスク名
+$FullTaskName = "\MURA\Auto Windows Update Log Remove"
+
+# スクリプト
+$Script = "C:\WindowsUpdate\RemoveLog.ps1"
+
+# ログ削除 スケジュール登録
+EntorySchedule $FullTaskName $Script $LogRemoveStart
+
+echo "以下でログ削除スケジュールを登録しました"
+echo "タスク名   : $FullTaskName"
+echo "開始時刻   : $LogRemoveStart"

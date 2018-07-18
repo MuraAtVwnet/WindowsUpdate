@@ -38,6 +38,11 @@
             SetupSchedule-MonthlyWU.ps1 -StartTime 04:00 -WuDelay 3 -WuOption Full
             毎月の Windows Update 日から3日経過した 4:00 AM に Full オプションで AutoWindowsUpdate.ps1 を実行するスケジュールを登録します
 
+    RemoveLog.ps1
+        内部処理用(単独でこのスクリプトを使うことは想定していません)
+        SetupSchedule-DaylyWU.ps1 / SetupSchedule-MonthlyWU.ps1 がスケジュールに登録するスクリプト
+        過去ログ(3か月前)を削除します
+
     GoWU.ps1
         内部処理用(単独でこのスクリプトを使うことは想定していません)
         SetupSchedule-MonthlyWU.ps1 がスケジュールに登録するスクリプト
