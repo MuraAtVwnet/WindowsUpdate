@@ -15,15 +15,19 @@
         引数に「 Full 」を与えると全ての更新を適用します
         引数なし or 「 Minimum 」を与えると重要な更新のみを適用します
 
+        Build Update 時に boot loop に陥ることがあるので、Build Update が含まれる場合は -ConsiderationBU オプションを指定してください
+        (稼働時間が短い時はこのスクリプトを実行しないようにします)
+
     SetupSchedule-DaylyWU.ps1
         AutoWindowsUpdate.ps1 を毎日指定時刻に実行するスケジュールを登録します
 
         引数
             -StartTime : 開始時刻 HH:MM の 24h 表記
             -WuOption  : AutoWindowsUpdate.ps1 のオプションと同じ
+            -ConsiderationBU : Build Update 時に boot loop に陥らないようにする
 
         例
-            SetupSchedule-DaylyWU.ps1 -StartTime 04:00 -WuOption Full
+            SetupSchedule-DaylyWU.ps1 -StartTime 04:00 -WuOption Full -ConsiderationBU
             毎日 4:00 AM に Full オプションで AutoWindowsUpdate.ps1 を実行するスケジュールを登録します
 
     SetupSchedule-MonthlyWU.ps1
@@ -33,9 +37,10 @@
             -StartTime : 開始時刻 HH:MM の 24h 表記
             -WuDelay   : Windows Update 日(第2火曜日の翌日)からのディレイ日
             -WuOption  : AutoWindowsUpdate.ps1 のオプションと同じ
+            -ConsiderationBU : Build Update 時に boot loop に陥らないようにする
 
         例
-            SetupSchedule-MonthlyWU.ps1 -StartTime 04:00 -WuDelay 3 -WuOption Full
+            SetupSchedule-MonthlyWU.ps1 -StartTime 04:00 -WuDelay 3 -WuOption Full -ConsiderationBU
             毎月の Windows Update 日から3日経過した 4:00 AM に Full オプションで AutoWindowsUpdate.ps1 を実行するスケジュールを登録します
 
     RemoveLog.ps1
