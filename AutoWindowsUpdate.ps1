@@ -12,6 +12,12 @@ Windows Update と再起動を自動実行します
     重要な更新プログラムのみを適用します
     オプションを省略した場合はこのモードになります
 
+・Build Update 時の boot loop 抑制(-ConsiderationBU)
+    Build Update 時に boot loop に陥らないようにします
+    Windows 10 で Windows Update を定期スケジュールを組む場合に指定します。
+    初期構築時の Windows Update では使用しません
+    (3 時間以内に起動/再起動されている場合はスクリプトを実行しません)
+
 .EXAMPLE
 PS C:\WindowsUpdate> .\AutoWindowsUpdate.ps1 Full
 
@@ -22,11 +28,21 @@ PS C:\WindowsUpdate> .\AutoWindowsUpdate.ps1
 
 重要な更新プログラムのみを適用
 
+.EXAMPLE
+PS C:\WindowsUpdate> .\AutoWindowsUpdate.ps1 Full -ConsiderationBU
+
+Build Update を考慮した全ての更新プログラムを適用
+
 .PARAMETER Option
 操作モード
-    Full: 全ての更新プログラムを適用
-    Minimum: 重要な更新プログラムのみを適用
-    省略: 重要な更新プログラムのみを適用
+    Full    : 全ての更新プログラムを適用
+    Minimum : 重要な更新プログラムのみを適用
+    省略    : 重要な更新プログラムのみを適用
+
+.PARAMETER ConsiderationBU
+Build Update を考慮
+    指定: Build Update 時に boot loop に陥らないようにする
+    省略: Build Update を考慮せずに Windows Update する
 
 <CommonParameters> はサポートしていません
 
@@ -44,7 +60,8 @@ http://www.vwnet.jp/Windows/PowerShell/FullAutoWU.htm
 #
 ##########################################################################
 param (
-		[ValidateSet("Full", "Minimum")][string]$Option # アップデートオプション
+		[ValidateSet("Full", "Minimum")][string]$Option,	# アップデートオプション
+		[switch]$ConsiderationBU							# Build Update を考慮
 	)
 
 # スクリプトの配置場所
@@ -56,6 +73,9 @@ $G_SetTimeStampFileName = "WU_TimeStamp.txt"
 
 # 最大適用更新数
 $G_MaxUpdateNumber = 100
+
+# 再起動禁止時間
+$G_BootProhibitionTime = 3
 
 # スクリプトの配置場所
 $G_ScriptDir = Split-Path $MyInvocation.MyCommand.Path -Parent
@@ -303,6 +323,21 @@ if( $Version -lt 6.1 ){
 if( -not(Test-Path $G_MyName )){
 	Log "スクリプトを $G_MyName に置いて実行してください"
 	exit
+}
+
+# Build Update 考慮
+if( $ConsiderationBU ){
+	$WMI_OpreationSystem = Get-WmiObject win32_operatingsystem
+	$Now = $WMI_OpreationSystem.LocalDateTime
+	$Boot = $WMI_OpreationSystem.LastBootUpTime
+	$BootDateTime = $WMI_OpreationSystem.ConvertToDateTime($Boot)
+	$NowDateTime = $WMI_OpreationSystem.ConvertToDateTime($Now)
+	$UpTime = $NowDateTime - $BootDateTime
+	$UpTimeHours = [int]$UpTime.TotalHours
+	if( $UpTimeHours -le $G_BootProhibitionTime ){
+		Log "Build Updae 考慮のため、稼働時間が $G_BootProhibitionTime h より短い場合は Windows Update しません : $UpTimeHours h"
+		exit
+	}
 }
 
 # 既知の問題(KB2962824)対応

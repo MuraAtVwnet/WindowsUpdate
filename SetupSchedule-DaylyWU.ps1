@@ -3,7 +3,8 @@
 #################################################################
 param (
 	$StartTime,				# スケジュール開始時刻(00:00)
-	[ValidateSet("Full", "Minimum")][string]$WuOption = "Minimum"	# オプション
+	[ValidateSet("Full", "Minimum")][string]$WuOption = "Minimum",	# オプション
+	[switch]$ConsiderationBU	# Build Update を考慮
 	)
 
 ##########################################################################
@@ -11,7 +12,7 @@ param (
 ##########################################################################
 function Usage(){
 	echo "Usage..."
-	echo "    RegistSchedule.ps1 StartTime(99:99) WuOptin( Minimum | Full )"
+	echo "    RegistSchedule.ps1 StartTime(99:99) WuOptin( Minimum | Full ) [-ConsiderationBU]"
 	exit
 }
 
@@ -69,9 +70,14 @@ function GetLogRemoveStart( $WUTime ){
 #######################################################
 # スケジュール登録
 #######################################################
-function EntorySchedule( $FullTaskName, $Script, $RunTime, $Option ){
+function EntorySchedule( $FullTaskName, $Script, $RunTime, $Option, $ConsiderationBU = $false ){
 
-	SCHTASKS /Create /tn $FullTaskName /tr "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe $Script $Option" /ru "SYSTEM" /sc daily /st $RunTime /f
+	if( $ConsiderationBU ){
+		SCHTASKS /Create /tn $FullTaskName /tr "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe $Script $Option -ConsiderationBU" /ru "SYSTEM" /sc daily /st $RunTime /f
+	}
+	else{
+		SCHTASKS /Create /tn $FullTaskName /tr "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe $Script $Option" /ru "SYSTEM" /sc daily /st $RunTime /f
+	}
 }
 
 
@@ -101,12 +107,13 @@ $Script = "C:\WindowsUpdate\AutoWindowsUpdate.ps1"
 $Option = [string]$WuOption
 
 # WU スケジュール登録
-EntorySchedule $FullTaskName $Script $StartTime $Option
+EntorySchedule $FullTaskName $Script $StartTime $Option $ConsiderationBU
 
 echo "以下で Windows Update スケジュールを登録しました"
 echo "タスク名   : $FullTaskName"
 echo "開始時刻   : $StartTime"
 echo "オプション : $WuOption"
+echo "BU 考慮    : $ConsiderationBU"
 echo ""
 
 # Log 削除開始時刻

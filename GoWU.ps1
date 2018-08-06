@@ -3,7 +3,8 @@
 #################################################################
 param (
 	$LC_WuDelay = 7,			# WU 実行ディレイ(WU 日からの経過日)
-	[ValidateSet("Full", "Minimum")][string]$LC_WuOption = "Minimum"	# オプション
+	[ValidateSet("Full", "Minimum")][string]$LC_WuOption = "Minimum",	# オプション
+	[switch]$ConsiderationBU	# Build Update を考慮
 	)
 
 # スクリプトの配置場所
@@ -106,7 +107,13 @@ Log "[INFO] Diff : $DiffDays / Delay $LC_WuDelay"
 # 指定経過日
 if( $DiffDays -eq $LC_WuDelay ){
 	# WU 実施
-	Log "[INFO] Go Windows Update : $LC_WuOption"
-	. $LC_WuScript $LC_WuOption
+	if($ConsiderationBU){
+		Log "[INFO] Go Windows Update : $LC_WuOption -ConsiderationBU"
+		. $LC_WuScript $LC_WuOption -ConsiderationBU
+	}
+	else{
+		Log "[INFO] Go Windows Update : $LC_WuOption"
+		. $LC_WuScript $LC_WuOption
+	}
 }
 
