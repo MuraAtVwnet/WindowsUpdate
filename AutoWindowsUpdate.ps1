@@ -61,7 +61,8 @@ http://www.vwnet.jp/Windows/PowerShell/FullAutoWU.htm
 ##########################################################################
 param (
 		[ValidateSet("Full", "Minimum")][string]$Option,	# アップデートオプション
-		[switch]$ConsiderationBU							# Build Update を考慮
+		[switch]$ConsiderationBU,							# Build Update を考慮
+		[switch]$MessageTest								# Microsoft Teams メッセージ送信テスト
 	)
 
 # スクリプトの配置場所
@@ -77,8 +78,8 @@ $G_MaxUpdateNumber = 100
 # 再起動禁止時間
 $G_BootProhibitionTime = 3
 
-# スクリプトの配置場所
-$G_ScriptDir = Split-Path $MyInvocation.MyCommand.Path -Parent
+# Microsoft Teams メッセージ送信用 URI ファイル名
+$G_MicrosoftTeamsUriFileName = "MST_URI.txt"
 
 $G_LogPath = "C:\WU_Log"
 $G_LogName = "WU_Log.txt"
@@ -295,6 +296,45 @@ function RemoveTimeStampFile($SetTimeStampFilePath, $SetTimeStampFileName){
 	return
 }
 
+##########################################################
+# Windows Update Rebbot を Teames に通知する
+##########################################################
+function NoticeWU($FilePath, $FileName){
+
+	$FileFullPath = Join-Path $FilePath $FileName
+
+	if( -not (Test-Path $FileFullPath)){
+		# URI ファイルが無い時は何もしない
+		Log "URI file not found : $FileFullPath"
+		return
+	}
+
+	# Web API の URL
+	[array]$Lines = Get-Content -Path $FileFullPath
+	if( $Lines.Count -eq 0 ){
+		# データが入っていない
+		Log "URI file is empty : $FileFullPath"
+		return
+	}
+	$url = $Lines[0]
+	if( $url.Length -le 35 ){
+		# URIが短すぎ
+		Log "URI data is empty : $FileFullPath"
+		return
+	}
+
+	# Invoke-RestMethod に渡す Web API の引数を JSON にする
+	$HostName = hostname
+
+	$body = ConvertTo-JSON @{
+	    text = "Windows Update reboot now ! : $HostName"
+	}
+
+	# API を叩く
+	Invoke-RestMethod -Method Post -Uri $url -Body $body -ContentType 'application/json'
+}
+
+
 ##########################################################################
 #
 # main
@@ -302,6 +342,13 @@ function RemoveTimeStampFile($SetTimeStampFilePath, $SetTimeStampFileName){
 ##########################################################################
 if (-not(([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator"))) {
 	Log "実行には管理権限が必要です"
+	exit
+}
+
+# Microsoft Teams メッセージ送信テスト
+if( $MessageTest ){
+	Log "Message send test"
+	NoticeWU $G_SetTimeStampFilePath $G_MicrosoftTeamsUriFileName
 	exit
 }
 
@@ -471,6 +518,7 @@ else{
 			EnableAutoexec $G_MyName $Option
 			sleep 30
 			Log "Reboot system now !!"
+			NoticeWU $G_SetTimeStampFilePath $G_MicrosoftTeamsUriFileName
 			Restart-Computer -Force
 		}
 		else
