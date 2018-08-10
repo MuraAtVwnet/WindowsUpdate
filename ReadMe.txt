@@ -18,6 +18,7 @@
         引数に「 -ConsiderationBU 」を与えると Build Update を考慮して bool loop に陥らないようにします
         Build Update 時に boot loop に陥ることがあるので、Build Update が含まれる場合は -ConsiderationBU オプションを指定してください
         (稼働時間が短い時はこのスクリプトを実行しないようにします)
+        Build Update はスクリプトで完結しない事があるので、その場合は GUI で Build Update を完了させてください。
 
         引数に「 -MessageTest 」を与えると Microsoft Teams へのメッセージ送信テストをします
 
