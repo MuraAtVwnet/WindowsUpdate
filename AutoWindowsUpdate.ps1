@@ -70,7 +70,10 @@ $G_MyName = "C:\WindowsUpdate\AutoWindowsUpdate.ps1"
 
 # 完了時刻記録ファイル
 $G_SetTimeStampFilePath = "C:\WindowsUpdate"
-$G_SetTimeStampFileName = "WU_TimeStamp.txt"
+$G_CompleteTimeStampFileName = "WU_TimeStamp.txt"
+
+# 再起動時刻記録ファイル
+$G_RebootTimeStampFileName = "Reboot_TimeStamp.txt"
 
 # 最大適用更新数
 $G_MaxUpdateNumber = 100
@@ -152,7 +155,7 @@ function RegSet( $RegPath, $RegKey, $RegKeyType, $RegKeyValue ){
 ##########################################################################
 # Autoexec.ps1 有効
 ##########################################################################
-function EnableAutoexec( $ScriptName, $Option ){
+function EnableAutoexec( $ScriptName, $Option, $ConsiderationBU ){
 	if( -not (Test-Path $ScriptName)){
 		Log "[FAIL] $ScriptName not found !!"
 		exit
@@ -179,7 +182,12 @@ function EnableAutoexec( $ScriptName, $Option ){
 
 	$RegKey = "Parameters"
 	$RegKeyType = "String"
-	$RegKeyValue = "$Option"
+	if( $ConsiderationBU ){
+		$RegKeyValue = "$Option -ConsiderationBU"
+	}
+	else{
+		$RegKeyValue = "$Option"
+	}
 	RegSet $RegPath $RegKey $RegKeyType $RegKeyValue
 
 	$RegKey = "IsPowershell"
@@ -206,7 +214,12 @@ function EnableAutoexec( $ScriptName, $Option ){
 
 	$RegKey = "Parameters"
 	$RegKeyType = "String"
-	$RegKeyValue = "$Option"
+	if( $ConsiderationBU ){
+		$RegKeyValue = "$Option -ConsiderationBU"
+	}
+	else{
+		$RegKeyValue = "$Option"
+	}
 	RegSet $RegPath $RegKey $RegKeyType $RegKeyValue
 
 	### 自動実行するスクリプトを autoexec.ps1 に上書きコピー
@@ -245,7 +258,32 @@ function DisableAutoexec(){
 	if(Test-Path $Terget){
 		del $Terget -Force
 	}
-	Log "[INFO] Autoexec Disabled."}
+	Log "[INFO] Autoexec Disabled."
+}
+
+
+##########################################################################
+# 処理続行しても良いか?
+##########################################################################
+function CanContinueProcess(){
+
+	# 前回再起動時刻
+	$RebootTime = GetTimeStampFile $G_SetTimeStampFilePath $G_RebootTimeStampFileName
+	if( $RebootTime -eq $null ){
+		# 一度も再起動していない
+		return $true
+	}
+
+	$TimeSpan = New-TimeSpan $RebootTime (Get-Date)
+	$TotalHours = $TimeSpan.TotalHours
+	if( $TotalHours -le $G_BootProhibitionTime ){
+		Log "Build Updae 考慮のため、稼働時間が $G_BootProhibitionTime h より短い場合は Windows Update しません : $TotalHours h"
+		return $false
+	}
+	else{
+		return $true
+	}
+}
 
 
 ##########################################################################
@@ -274,6 +312,29 @@ function SetTimeStampFile($SetTimeStampFilePath, $SetTimeStampFileName){
 		exit
 	}
 }
+
+##########################################################################
+# タイムスタンプファイル読み込み
+##########################################################################
+function GetTimeStampFile($SetTimeStampFilePath, $SetTimeStampFileName){
+
+	$SetTimeStampFileFullName = Join-Path $SetTimeStampFilePath $SetTimeStampFileName
+
+	if( -not (Test-Path $SetTimeStampFileFullName)){
+		return $null
+	}
+
+	try{
+		[datetime]$GetTime = Get-Content -Path $SetTimeStampFileFullName
+	}
+	catch{
+		Log "[FAIL] !!!!!!!! $SetTimeStampFileFullName read error. !!!!!!!!"
+		exit
+	}
+
+	return $GetTime
+}
+
 
 ##########################################################################
 # タイムスタンプファイル削除
@@ -327,7 +388,7 @@ function NoticeWU($FilePath, $FileName){
 	$HostName = hostname
 
 	$body = ConvertTo-JSON @{
-	    text = "Windows Update reboot now ! : $HostName"
+		text = "Windows Update reboot now ! : $HostName"
 	}
 
 	# API を叩く
@@ -374,17 +435,19 @@ if( -not(Test-Path $G_MyName )){
 
 # Build Update 考慮
 if( $ConsiderationBU ){
-	$WMI_OpreationSystem = Get-WmiObject win32_operatingsystem
-	$Now = $WMI_OpreationSystem.LocalDateTime
-	$Boot = $WMI_OpreationSystem.LastBootUpTime
-	$BootDateTime = $WMI_OpreationSystem.ConvertToDateTime($Boot)
-	$NowDateTime = $WMI_OpreationSystem.ConvertToDateTime($Now)
-	$UpTime = $NowDateTime - $BootDateTime
-	$UpTimeHours = [int]$UpTime.TotalHours
-	if( $UpTimeHours -le $G_BootProhibitionTime ){
-		Log "Build Updae 考慮のため、稼働時間が $G_BootProhibitionTime h より短い場合は Windows Update しません : $UpTimeHours h"
+	Log "Build Update 考慮判定"
+	if( CanContinueProcess ){
+		# 継続可能なので NOP
+		Log "Build Update ではないので Windows Update 継続"
+	}
+	else{
+		# Build Update 中なので処理終了
+		Log "Build Update 中なで Windows Update 終了"
 		exit
 	}
+}
+else{
+	Log "Build Update は考慮しない"
 }
 
 # 既知の問題(KB2962824)対応
@@ -397,7 +460,7 @@ if(($Version -ge 6.3) -and ($Version -lt 6.4)){
 		$BitLocker = Get-WindowsFeature BitLocker
 		if( $BitLocker.Installed -eq $false ){
 			Log "BitLocker がインストールされていないのでインストール & 再起動"
-			EnableAutoexec $G_MyName $Option
+			EnableAutoexec $G_MyName $Option $ConsiderationBU
 			Add-WindowsFeature BitLocker -Restart
 		}
 		$ProgressPreference = $OriginalProgressPreference
@@ -407,7 +470,7 @@ if(($Version -ge 6.3) -and ($Version -lt 6.4)){
 Log "--- Running Windows Update ---"
 
 # 完了タイムスタンプファイル削除
-RemoveTimeStampFile $G_SetTimeStampFilePath $G_SetTimeStampFileName
+RemoveTimeStampFile $G_SetTimeStampFilePath $G_CompleteTimeStampFileName
 
 Log "Searching for updates..."
 $updateSession = new-object -com "Microsoft.Update.Session"
@@ -430,7 +493,7 @@ else{
 Log "List of applicable items on the machine:"
 if ($searchResult.Updates.Count -eq 0) {
 	Log "There are no applicable updates."
-	SetTimeStampFile $G_SetTimeStampFilePath $G_SetTimeStampFileName
+	SetTimeStampFile $G_SetTimeStampFilePath $G_CompleteTimeStampFileName
 	Log "=-=-=-=-=- Windows Update finished -=-=-=-=-="
 }
 else{
@@ -515,16 +578,17 @@ else{
 			Log "One or more updates are requiring reboot."
 
 			Log "[INFO] Autoexec Enabled"
-			EnableAutoexec $G_MyName $Option
+			EnableAutoexec $G_MyName $Option $ConsiderationBU
 			sleep 30
 			Log "Reboot system now !!"
+			SetTimeStampFile $G_SetTimeStampFilePath $G_RebootTimeStampFileName
 			NoticeWU $G_SetTimeStampFilePath $G_MicrosoftTeamsUriFileName
 			Restart-Computer -Force
 		}
 		else
 		{
 			Log "Finished. Reboot are not required."
-			SetTimeStampFile $G_SetTimeStampFilePath $G_SetTimeStampFileName
+			SetTimeStampFile $G_SetTimeStampFilePath $G_CompleteTimeStampFileName
 			Log "=-=-=-=-=- Windows Update finished -=-=-=-=-="
 		}
 	}
