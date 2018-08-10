@@ -18,6 +18,10 @@ Windows Update と再起動を自動実行します
     初期構築時の Windows Update では使用しません
     (3 時間以内に起動/再起動されている場合はスクリプトを実行しません)
 
+・Microsoft Teams へのメッセージ送信テスト(-MessageTest)
+    メッセージ送信だけをします
+    (Windows Update はしません)
+
 .EXAMPLE
 PS C:\WindowsUpdate> .\AutoWindowsUpdate.ps1 Full
 
@@ -33,6 +37,11 @@ PS C:\WindowsUpdate> .\AutoWindowsUpdate.ps1 Full -ConsiderationBU
 
 Build Update を考慮した全ての更新プログラムを適用
 
+.EXAMPLE
+PS C:\WindowsUpdate> .\AutoWindowsUpdate.ps1 -MessageTest
+
+Microsoft Teams へのメッセージ送信テスト
+
 .PARAMETER Option
 操作モード
     Full    : 全ての更新プログラムを適用
@@ -43,6 +52,11 @@ Build Update を考慮した全ての更新プログラムを適用
 Build Update を考慮
     指定: Build Update 時に boot loop に陥らないようにする
     省略: Build Update を考慮せずに Windows Update する
+
+.PARAMETER MessageTest
+Microsoft Teams へのメッセージ送信テスト
+    指定: メッセージ送信テストだけを実行する
+    省略: 通常処理
 
 <CommonParameters> はサポートしていません
 
@@ -275,10 +289,11 @@ function CanContinueProcess(){
 	}
 
 	$TimeSpan = New-TimeSpan $RebootTime (Get-Date)
-	$TotalHours = $TimeSpan.TotalHours
+	[int]$TotalHours = $TimeSpan.TotalHours
 	if( $TotalHours -le $G_BootProhibitionTime ){
-		Log "Build Updae 考慮のため、稼働時間が $G_BootProhibitionTime h より短い場合は Windows Update しません : $TotalHours h"
-		return $false
+		Log "For Build Updae Consideration, Windows does not Update if uptime is shorter than $G_BootProhibitionTime h : $TotalHours h"
+		Log "=-=-=-=-=- Windows Update Abort -=-=-=-=-="
+		exit
 	}
 	else{
 		return $true
@@ -402,7 +417,7 @@ function NoticeWU($FilePath, $FileName){
 #
 ##########################################################################
 if (-not(([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator"))) {
-	Log "実行には管理権限が必要です"
+	Log "Administrative privileges are required to run"
 	exit
 }
 
@@ -423,31 +438,26 @@ $strVersion = $OSData.Version
 $strVersion = $strVersion.Replace( ".$BuildNumber", "" )
 $Version = [decimal]$strVersion
 if( $Version -lt 6.1 ){
-	Log "Windows Server 2008 R2 / Windows 7 以降しかサポートしていません"
+	Log "Supports Windows Server 2008 R2/Windows 7 or later"
 	exit
 }
 
 # スクリプト存在確認
 if( -not(Test-Path $G_MyName )){
-	Log "スクリプトを $G_MyName に置いて実行してください"
+	Log "Put the script in $G _myname and run it"
 	exit
 }
 
 # Build Update 考慮
 if( $ConsiderationBU ){
-	Log "Build Update 考慮判定"
-	if( CanContinueProcess ){
-		# 継続可能なので NOP
-		Log "Build Update ではないので Windows Update 継続"
-	}
-	else{
-		# Build Update 中なので処理終了
-		Log "Build Update 中なで Windows Update 終了"
-		exit
-	}
+	Log "Build Update Consideration decision"
+	CanContinueProcess	# 継続してはいけない時は function 内で処理終了
+
+	Log "Windows Update continues because it is not Build update"
+
 }
 else{
-	Log "Build Update は考慮しない"
+	Log "Do not consider Build Update"
 }
 
 # 既知の問題(KB2962824)対応
@@ -459,7 +469,7 @@ if(($Version -ge 6.3) -and ($Version -lt 6.4)){
 		$ProgressPreference="SilentlyContinue"
 		$BitLocker = Get-WindowsFeature BitLocker
 		if( $BitLocker.Installed -eq $false ){
-			Log "BitLocker がインストールされていないのでインストール & 再起動"
+			Log "Install & Restart because BitLocker is not installed"
 			EnableAutoexec $G_MyName $Option $ConsiderationBU
 			Add-WindowsFeature BitLocker -Restart
 		}

@@ -15,8 +15,16 @@
         引数に「 Full 」を与えると全ての更新を適用します
         引数なし or 「 Minimum 」を与えると重要な更新のみを適用します
 
+        引数に「 -ConsiderationBU 」を与えると Build Update を考慮して bool loop に陥らないようにします
         Build Update 時に boot loop に陥ることがあるので、Build Update が含まれる場合は -ConsiderationBU オプションを指定してください
         (稼働時間が短い時はこのスクリプトを実行しないようにします)
+
+        引数に「 -MessageTest 」を与えると Microsoft Teams へのメッセージ送信テストをします
+
+        C:\WindowsUpdate に MST_URI.txt を置くと、Windows Update で再起動されるときに Microsoft Teams にメッセージを送ります
+        MST_URI.txt には Microsoft Teams へのアクセス URI を書きます
+            Microsoft Teams へ PowerShell からメッセージを飛ばす
+            http://www.vwnet.jp/windows/PowerShell/2018080101/MicrosoftTeamsMessageFromPowerShell.htm
 
     SetupSchedule-DaylyWU.ps1
         AutoWindowsUpdate.ps1 を毎日指定時刻に実行するスケジュールを登録します
