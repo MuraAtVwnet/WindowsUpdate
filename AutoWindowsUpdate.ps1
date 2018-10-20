@@ -277,26 +277,24 @@ function DisableAutoexec(){
 
 
 ##########################################################################
-# 処理続行しても良いか?
+# WU で再起動されたかの確認
 ##########################################################################
-function CanContinueProcess(){
+function IsWURebooted(){
 
 	# 前回再起動時刻
 	$RebootTime = GetTimeStampFile $G_SetTimeStampFilePath $G_RebootTimeStampFileName
 	if( $RebootTime -eq $null ){
 		# 一度も再起動していない
-		return $true
+		return $false
 	}
 
 	$TimeSpan = New-TimeSpan $RebootTime (Get-Date)
 	[int]$TotalHours = $TimeSpan.TotalHours
 	if( $TotalHours -le $G_BootProhibitionTime ){
-		Log "For Build Updae Consideration, Windows does not Update if uptime is shorter than $G_BootProhibitionTime h : $TotalHours h"
-		Log "=-=-=-=-=- Windows Update Abort -=-=-=-=-="
-		exit
+		return $true
 	}
 	else{
-		return $true
+		return $false
 	}
 }
 
@@ -512,10 +510,15 @@ if( -not(Test-Path $G_MyName )){
 # Build Update 考慮
 if( $ConsiderationBU ){
 	Log "Build Update Consideration decision"
-	CanContinueProcess	# 継続してはいけない時は function 内で処理終了
-
-	Log "Windows Update continues because it is not Build update"
-
+	$Status = IsWURebooted	# 指定時間内に WU 再起動さたか
+	if( $Status -eq $true ){
+		Log "For Build Updae Consideration, Windows does not Update if uptime is shorter than $G_BootProhibitionTime h : $TotalHours h"
+		Log "=-=-=-=-=- Windows Update Abort -=-=-=-=-="
+		exit
+	}
+	else{
+		Log "Windows Update continues because it is not Build update"
+	}
 }
 else{
 	Log "Do not consider Build Update"
@@ -565,6 +568,12 @@ Log "List of applicable items on the machine:"
 if ($searchResult.Updates.Count -eq 0) {
 	Log "There are no applicable updates."
 	SetTimeStampFile $G_SetTimeStampFilePath $G_CompleteTimeStampFileName
+
+	$Status = IsWURebooted	# 指定時間内に WU 再起動さたか
+	if( $Status -eq $true ){
+		NoticeFinishWU $G_SetTimeStampFilePath $G_MicrosoftTeamsUriFileName
+	}
+
 	Log "=-=-=-=-=- Windows Update finished -=-=-=-=-="
 }
 else{
@@ -629,7 +638,6 @@ else{
 	}
 	if ( $updatesToInstall.Count -eq 0 ) {
 		Log "Not ready for installation."
-		NoticeFinishWU $G_SetTimeStampFilePath $G_MicrosoftTeamsUriFileName
 		Log "=-=-=-=-=- Windows Update Abnormal End -=-=-=-=-="
 	}
 	else
@@ -661,7 +669,11 @@ else{
 		{
 			Log "Finished. Reboot are not required."
 			SetTimeStampFile $G_SetTimeStampFilePath $G_CompleteTimeStampFileName
-			NoticeFinishWU $G_SetTimeStampFilePath $G_MicrosoftTeamsUriFileName
+
+			$Status = IsWURebooted	# 指定時間内に WU 再起動さたか
+			if( $Status -eq $true ){
+				NoticeFinishWU $G_SetTimeStampFilePath $G_MicrosoftTeamsUriFileName
+			}
 			Log "=-=-=-=-=- Windows Update finished -=-=-=-=-="
 		}
 	}
