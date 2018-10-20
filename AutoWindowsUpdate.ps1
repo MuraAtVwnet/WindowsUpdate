@@ -373,7 +373,7 @@ function RemoveTimeStampFile($SetTimeStampFilePath, $SetTimeStampFileName){
 }
 
 ##########################################################
-# Windows Update Rebbot を Teames に通知する
+# Windows Update Reboot を Teames に通知する
 ##########################################################
 function NoticeWU($FilePath, $FileName){
 
@@ -410,6 +410,66 @@ function NoticeWU($FilePath, $FileName){
 	Invoke-RestMethod -Method Post -Uri $url -Body $body -ContentType 'application/json'
 }
 
+##########################################################
+# Windows Update 完了 を Teames に通知する
+##########################################################
+function NoticeFinishWU($FilePath, $FileName){
+
+	$FileFullPath = Join-Path $FilePath $FileName
+
+	if( -not (Test-Path $FileFullPath)){
+		# URI ファイルが無い時は何もしない
+		Log "URI file not found : $FileFullPath"
+		return
+	}
+
+	# Web API の URL
+	[array]$Lines = Get-Content -Path $FileFullPath
+	if( $Lines.Count -eq 0 ){
+		# データが入っていない
+		Log "URI file is empty : $FileFullPath"
+		return
+	}
+	$url = $Lines[0]
+	if( $url.Length -le 35 ){
+		# URIが短すぎ
+		Log "URI data is empty : $FileFullPath"
+		return
+	}
+
+	# ビルド番号詳細
+	$RegPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion"
+	$RegKey = "BuildLabEx"
+	$RegistryBuildNumber = (Get-ItemProperty $RegPath -name $RegKey).$RegKey
+
+	# Winver のビルド番号
+	$RegPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion"
+	$RegKey = "CurrentBuild"
+	$MajorNumber = (Get-ItemProperty -Path $RegPath -name $RegKey).$RegKey
+	$RegKey = "UBR"
+	$MinorNumber = (Get-ItemProperty -Path $RegPath -name $RegKey).$RegKey
+	$WinverBuildNumber = $MajorNumber + "." + [String]$MinorNumber
+
+	# Winver のバージョン
+	$RegPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion"
+	$RegKey = "ReleaseId"
+	$OSVertion = (Get-ItemProperty $RegPath -name $RegKey -ErrorAction SilentlyContinue).$RegKey
+
+	# Invoke-RestMethod に渡す Web API の引数を JSON にする
+	$HostName = hostname
+	$Message = "Windows Update finish : $HostName`n`r"
+	$Message += "Registry Build Number : $RegistryBuildNumber`n`r"
+	$Message += "Winver Build Number : $WinverBuildNumber`n`r"
+	$Message += "OS Vertion : $OSVertion"
+
+	$body = ConvertTo-JSON @{
+		text = $Message
+	}
+
+	# API を叩く
+	Invoke-RestMethod -Method Post -Uri $url -Body $body -ContentType 'application/json'
+}
+
 
 ##########################################################################
 #
@@ -425,6 +485,7 @@ if (-not(([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
 if( $MessageTest ){
 	Log "Message send test"
 	NoticeWU $G_SetTimeStampFilePath $G_MicrosoftTeamsUriFileName
+	NoticeFinishWU $G_SetTimeStampFilePath $G_MicrosoftTeamsUriFileName
 	exit
 }
 
@@ -568,6 +629,7 @@ else{
 	}
 	if ( $updatesToInstall.Count -eq 0 ) {
 		Log "Not ready for installation."
+		NoticeFinishWU $G_SetTimeStampFilePath $G_MicrosoftTeamsUriFileName
 		Log "=-=-=-=-=- Windows Update Abnormal End -=-=-=-=-="
 	}
 	else
@@ -599,6 +661,7 @@ else{
 		{
 			Log "Finished. Reboot are not required."
 			SetTimeStampFile $G_SetTimeStampFilePath $G_CompleteTimeStampFileName
+			NoticeFinishWU $G_SetTimeStampFilePath $G_MicrosoftTeamsUriFileName
 			Log "=-=-=-=-=- Windows Update finished -=-=-=-=-="
 		}
 	}
