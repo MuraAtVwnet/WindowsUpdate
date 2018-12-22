@@ -507,23 +507,6 @@ if( -not(Test-Path $G_MyName )){
 	exit
 }
 
-# Build Update 考慮
-if( $ConsiderationBU ){
-	Log "Build Update Consideration decision"
-	$Status = IsWURebooted	# 指定時間内に WU 再起動さたか
-	if( $Status -eq $true ){
-		Log "For Build Updae Consideration, Windows does not Update if uptime is shorter than $G_BootProhibitionTime h : $TotalHours h"
-		Log "=-=-=-=-=- Windows Update Abort -=-=-=-=-="
-		exit
-	}
-	else{
-		Log "Windows Update continues because it is not Build update"
-	}
-}
-else{
-	Log "Do not consider Build Update"
-}
-
 # 既知の問題(KB2962824)対応
 if(($Version -ge 6.3) -and ($Version -lt 6.4)){
 	$OSData = Get-WmiObject Win32_OperatingSystem
@@ -655,8 +638,22 @@ else{
 			Log "Some updates could not installed."
 		}
 		if ( $installationResult.RebootRequired ) {
-			Log "One or more updates are requiring reboot."
+			# Build Update 考慮
+			if( $ConsiderationBU ){
+				Log "Build Update Consideration decision"
+				$Status = IsWURebooted	# 指定時間内に WU 再起動さたか
+				if( $Status -eq $true ){
+					Log "For Build Updae Consideration, Windows does not Update if uptime is shorter than $G_BootProhibitionTime h : $TotalHours h"
+					Log "=-=-=-=-=- Windows Update Abort -=-=-=-=-="
+					exit
+				}
+				else{
+					Log "Windows Update continues because it is not Build update"
+				}
+			}
 
+			# WU 再起動
+			Log "One or more updates are requiring reboot."
 			Log "[INFO] Autoexec Enabled"
 			EnableAutoexec $G_MyName $Option $ConsiderationBU
 			sleep 30
