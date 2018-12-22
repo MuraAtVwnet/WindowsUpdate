@@ -89,6 +89,9 @@ $G_CompleteTimeStampFileName = "WU_TimeStamp.txt"
 # 再起動時刻記録ファイル
 $G_RebootTimeStampFileName = "Reboot_TimeStamp.txt"
 
+# Build Vertion 記録ファイル
+$G_BuildVertionFileName = "Build_Vertion.txt"
+
 # 最大適用更新数
 $G_MaxUpdateNumber = 100
 
@@ -408,10 +411,143 @@ function NoticeWU($FilePath, $FileName){
 	Invoke-RestMethod -Method Post -Uri $url -Body $body -ContentType 'application/json'
 }
 
+##########################################################################
+# バージョンファイル出力
+##########################################################################
+function SetVersionFile($SetVersionFilePath, $SetVersionFileName, $BuildVertion ){
+
+	$SetVersionFileFullName = Join-Path $SetVersionFilePath $SetVersionFileName
+
+	if( -not (Test-Path $SetVersionFilePath)){
+		md $SetVersionFilePath
+	}
+
+	if( -not (Test-Path $SetVersionFilePath)){
+		Log "[FAIL] !!!!!!!! $SetVersionFilePath not created. !!!!!!!!"
+		exit
+	}
+
+	$RegistryBuildNumber = $BuildVertion.RegistryBuildNumber
+	$WinverBuildNumber = $BuildVertion.WinverBuildNumber
+	$OSVertion = $BuildVertion.OSVertion
+
+	$VertionDatas = @()
+
+	if($RegistryBuildNumber -ne $null){
+		$VertionDatas += $RegistryBuildNumber
+	}
+	else{
+		return
+	}
+
+	if( $WinverBuildNumber -ne $null ){
+		$VertionDatas += $WinverBuildNumber
+	}
+
+	if( $OSVertion -ne $null ){
+		$VertionDatas += $OSVertion
+	}
+
+	try{
+		Set-Content -Value $VertionDatas -Path $SetVersionFileFullName  -Encoding UTF8
+	}
+	catch{
+		Log "[FAIL] !!!!!!!! $SetVersionFileFullName not created. !!!!!!!!"
+		exit
+	}
+}
+
+
+##########################################################################
+# バージョンファイル読み込み
+##########################################################################
+function GetVersionFile($SetVersionFilePath, $SetVersionFileName){
+
+	$SetVersionFileFullName = Join-Path $SetVersionFilePath $SetVersionFileName
+
+	if( -not (Test-Path $SetVersionFileFullName)){
+		return $null
+	}
+
+	try{
+		[array]$VertionDatas = Get-Content -Path $SetVersionFileFullName
+	}
+	catch{
+		Log "[FAIL] !!!!!!!! $SetVersionFileFullName read error. !!!!!!!!"
+		exit
+	}
+
+	$ReturnData = New-Object PSObject | Select-Object RegistryBuildNumber, WinverBuildNumber, OSVertion
+
+	if( $VertionDatas.Count -eq 0 ){
+		return $null
+	}
+
+	if( $VertionDatas.Count -ge 1 ){
+		$ReturnData.RegistryBuildNumber = $VertionDatas[0]
+	}
+
+	if( $VertionDatas.Count -ge 2 ){
+		$ReturnData.WinverBuildNumber = $VertionDatas[1]
+	}
+
+	if( $VertionDatas.Count -ge 3 ){
+		$ReturnData.OSVertion = $VertionDatas[2]
+	}
+
+	return $ReturnData
+}
+
+
+##########################################################################
+# Build バージョン 取得
+##########################################################################
+function GetBuildVersion(){
+	$ReturnData = New-Object PSObject | Select-Object RegistryBuildNumber, WinverBuildNumber, OSVertion
+
+	# ビルド番号詳細
+	$RegPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion"
+	$RegKey = "BuildLabEx"
+	$RegistryBuildNumber = (Get-ItemProperty $RegPath -name $RegKey).$RegKey
+	if( $RegistryBuildNumber -ne $null ){
+		$ReturnData.RegistryBuildNumber = $RegistryBuildNumber
+	}
+	else{
+		$ReturnData.RegistryBuildNumber = $null
+	}
+
+	# Winver のビルド番号
+	$RegPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion"
+	$RegKey = "CurrentBuild"
+	$MajorNumber = (Get-ItemProperty -Path $RegPath -name $RegKey).$RegKey
+	$RegKey = "UBR"
+	$MinorNumber = (Get-ItemProperty -Path $RegPath -name $RegKey).$RegKey
+	$WinverBuildNumber = $MajorNumber + "." + [String]$MinorNumber
+	if( $MajorNumber -ne $null ){
+		$ReturnData.WinverBuildNumber = $WinverBuildNumber
+	}
+	else{
+		$ReturnData.WinverBuildNumber = $null
+	}
+
+	# Winver のバージョン
+	$RegPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion"
+	$RegKey = "ReleaseId"
+	$OSVertion = (Get-ItemProperty $RegPath -name $RegKey -ErrorAction SilentlyContinue).$RegKey
+	if( $OSVertion -ne $null ){
+		$ReturnData.OSVertion = $OSVertion
+	}
+	else{
+		$ReturnData.OSVertion = $null
+	}
+
+	return $ReturnData
+}
+
 ##########################################################
 # Windows Update 完了 を Teames に通知する
 ##########################################################
-function NoticeFinishWU($FilePath, $FileName){
+function NoticeFinishWU($FilePath, $FileName, $BuildVertion){
 
 	$FileFullPath = Join-Path $FilePath $FileName
 
@@ -435,26 +571,12 @@ function NoticeFinishWU($FilePath, $FileName){
 		return
 	}
 
-	# ビルド番号詳細
-	$RegPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion"
-	$RegKey = "BuildLabEx"
-	$RegistryBuildNumber = (Get-ItemProperty $RegPath -name $RegKey).$RegKey
-
-	# Winver のビルド番号
-	$RegPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion"
-	$RegKey = "CurrentBuild"
-	$MajorNumber = (Get-ItemProperty -Path $RegPath -name $RegKey).$RegKey
-	$RegKey = "UBR"
-	$MinorNumber = (Get-ItemProperty -Path $RegPath -name $RegKey).$RegKey
-	$WinverBuildNumber = $MajorNumber + "." + [String]$MinorNumber
-
-	# Winver のバージョン
-	$RegPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion"
-	$RegKey = "ReleaseId"
-	$OSVertion = (Get-ItemProperty $RegPath -name $RegKey -ErrorAction SilentlyContinue).$RegKey
-
 	# Invoke-RestMethod に渡す Web API の引数を JSON にする
 	$HostName = hostname
+	$RegistryBuildNumber = $BuildVertion.RegistryBuildNumber
+	$WinverBuildNumber = $BuildVertion.WinverBuildNumber
+	$OSVertion = $BuildVertion.OSVertion
+
 	$Message = "Windows Update finish : $HostName`n`r"
 	$Message += "Registry Build Number : $RegistryBuildNumber`n`r"
 	$Message += "Winver Build Number : $WinverBuildNumber`n`r"
@@ -466,6 +588,44 @@ function NoticeFinishWU($FilePath, $FileName){
 
 	# API を叩く
 	Invoke-RestMethod -Method Post -Uri $url -Body $body -ContentType 'application/json'
+}
+
+##########################################################
+# Windows Update 完了
+##########################################################
+function FinishWU(){
+	# バージョンファイル読み込み
+	$LastVertion = GetVersionFile $G_SetTimeStampFilePath $G_BuildVertionFileName
+
+	# Build バージョン 取得
+	$NowVertion = GetBuildVersion
+
+	# Build バージョン更新確認
+	if( ($LastVertion.RegistryBuildNumber -eq $NowVertion.RegistryBuildNumber) -and
+		($LastVertion.WinverBuildNumber   -eq $NowVertion.WinverBuildNumber) -and
+		($LastVertion.OSVertion           -eq $NowVertion.OSVertion)){
+
+		# バージョン更新なし
+		return
+	}
+	else{
+		# バージョン更新あり
+
+		# バージョンファイル出力
+		SetVersionFile $G_SetTimeStampFilePath $G_BuildVertionFileName $NowVertion
+
+		# Windows Update 完了 を Teames に通知する
+		NoticeFinishWU $G_SetTimeStampFilePath $G_MicrosoftTeamsUriFileName $NowVertion
+
+		# バージョン情報をログに出力
+		$RegistryBuildNumber = $NowVertion.RegistryBuildNumber
+		$WinverBuildNumber = $NowVertion.WinverBuildNumber
+		$OSVertion = $NowVertion.OSVertion
+
+		Log $RegistryBuildNumber
+		Log $WinverBuildNumber
+		Log $OSVertion
+	}
 }
 
 
@@ -483,7 +643,6 @@ if (-not(([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
 if( $MessageTest ){
 	Log "Message send test"
 	NoticeWU $G_SetTimeStampFilePath $G_MicrosoftTeamsUriFileName
-	NoticeFinishWU $G_SetTimeStampFilePath $G_MicrosoftTeamsUriFileName
 	exit
 }
 
@@ -552,11 +711,7 @@ if ($searchResult.Updates.Count -eq 0) {
 	Log "There are no applicable updates."
 	SetTimeStampFile $G_SetTimeStampFilePath $G_CompleteTimeStampFileName
 
-	$Status = IsWURebooted	# 指定時間内に WU 再起動さたか
-	if( $Status -eq $true ){
-		NoticeFinishWU $G_SetTimeStampFilePath $G_MicrosoftTeamsUriFileName
-	}
-
+	FinishWU
 	Log "=-=-=-=-=- Windows Update finished -=-=-=-=-="
 }
 else{
@@ -667,10 +822,7 @@ else{
 			Log "Finished. Reboot are not required."
 			SetTimeStampFile $G_SetTimeStampFilePath $G_CompleteTimeStampFileName
 
-			$Status = IsWURebooted	# 指定時間内に WU 再起動さたか
-			if( $Status -eq $true ){
-				NoticeFinishWU $G_SetTimeStampFilePath $G_MicrosoftTeamsUriFileName
-			}
+			FinishWU
 			Log "=-=-=-=-=- Windows Update finished -=-=-=-=-="
 		}
 	}
