@@ -503,7 +503,7 @@ function GetVersionFile($SetVersionFilePath, $SetVersionFileName){
 # Build バージョン 取得
 ##########################################################################
 function GetBuildVersion(){
-	$ReturnData = New-Object PSObject | Select-Object RegistryBuildNumber, WinverBuildNumber, OSVertion
+	$ReturnData = New-Object PSObject | Select-Object RegistryBuildNumber, WinverBuildNumber, OSVertion, Edition
 
 	# ビルド番号詳細
 	$RegPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion"
@@ -541,6 +541,13 @@ function GetBuildVersion(){
 		$ReturnData.OSVertion = $null
 	}
 
+	# OS のエディション
+	$Win32_OperatingSystem = Get-WmiObject Win32_OperatingSystem
+	$OS = $Win32_OperatingSystem.Caption
+	$SP = $Win32_OperatingSystem.ServicePackMajorVersion
+	if( $SP -ne 0 ){ $OS += " SP" + $SP }
+	$ReturnData.Edition = $OS
+
 	return $ReturnData
 }
 
@@ -576,11 +583,13 @@ function NoticeFinishWU($FilePath, $FileName, $BuildVertion){
 	$RegistryBuildNumber = $BuildVertion.RegistryBuildNumber
 	$WinverBuildNumber = $BuildVertion.WinverBuildNumber
 	$OSVertion = $BuildVertion.OSVertion
+	$OSEdition = $BuildVertion.Edition
 
 	$Message = "Windows Update finish : $HostName`n`r"
 	$Message += "Registry Build Number : $RegistryBuildNumber`n`r"
 	$Message += "Winver Build Number : $WinverBuildNumber`n`r"
-	$Message += "OS Vertion : $OSVertion"
+	$Message += "OS Vertion : $OSVertion`n`r"
+	$Message += "OS Edition : $OSEdition"
 
 	$body = ConvertTo-JSON @{
 		text = $Message
