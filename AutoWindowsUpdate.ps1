@@ -816,9 +816,18 @@ else{
 				}
 			}
 
+			# WU reboot loop 対策
+			# (短時間再起動の場合は、人が介入できるタイミングを稼ぐために5分待つ)
+			$Status = IsWURebooted	# 指定時間内に WU 再起動さたか
+			if( $Status -eq $true ){
+				Log "WU loop protection. Wait 5 minutes."
+				sleep 300
+			}
+
 			# WU 再起動
 			Log "One or more updates are requiring reboot."
 			Log "[INFO] Autoexec Enabled"
+
 			EnableAutoexec $G_MyName $Option $ConsiderationBU
 			sleep 30
 			Log "Reboot system now !!"
