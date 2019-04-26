@@ -589,7 +589,19 @@ function NoticeFinishWU($FilePath, $FileName, $BuildVertion){
 	$Message += "Registry Build Number : $RegistryBuildNumber`n`r"
 	$Message += "Winver Build Number : $WinverBuildNumber`n`r"
 	$Message += "OS Vertion : $OSVertion`n`r"
-	$Message += "OS Edition : $OSEdition"
+	$Message += "OS Edition : $OSEdition`n`r"
+
+	[array]$HotFixs = Get-HotFix | sort InstalledOn -Descending
+	foreach($HotFix in $HotFixs){
+		$WUDate = ($HotFix.InstalledOn).ToString("yyyy/MM/dd")
+		$KB = $HotFix.HotFixID
+		$KBType = $HotFix.Description
+		$Message += "$WUDate $KB $KBType`n`r"
+	}
+
+	# 末尾の CR/LF 削除
+	$MessageLength = $Message.Length -2
+	$Message = $Message.Substring(0, $MessageLength)
 
 	$body = ConvertTo-JSON @{
 		text = $Message
