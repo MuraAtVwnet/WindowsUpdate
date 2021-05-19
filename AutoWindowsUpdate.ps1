@@ -430,6 +430,7 @@ function SetVersionFile($SetVersionFilePath, $SetVersionFileName, $BuildVertion 
 	$RegistryBuildNumber = $BuildVertion.RegistryBuildNumber
 	$WinverBuildNumber = $BuildVertion.WinverBuildNumber
 	$OSVertion = $BuildVertion.OSVertion
+	$DisplayVersion = $BuildVertion.DisplayVersion
 
 	$VertionDatas = @()
 
@@ -447,6 +448,11 @@ function SetVersionFile($SetVersionFilePath, $SetVersionFileName, $BuildVertion 
 	if( $OSVertion -ne $null ){
 		$VertionDatas += $OSVertion
 	}
+
+	if( $DisplayVersion -ne $null ){
+		$VertionDatas += $DisplayVersion
+	}
+
 
 	try{
 		Set-Content -Value $VertionDatas -Path $SetVersionFileFullName  -Encoding UTF8
@@ -477,7 +483,7 @@ function GetVersionFile($SetVersionFilePath, $SetVersionFileName){
 		exit
 	}
 
-	$ReturnData = New-Object PSObject | Select-Object RegistryBuildNumber, WinverBuildNumber, OSVertion
+	$ReturnData = New-Object PSObject | Select-Object RegistryBuildNumber, WinverBuildNumber, OSVertion, DisplayVersion
 
 	if( $VertionDatas.Count -eq 0 ){
 		return $null
@@ -495,6 +501,10 @@ function GetVersionFile($SetVersionFilePath, $SetVersionFileName){
 		$ReturnData.OSVertion = $VertionDatas[2]
 	}
 
+	if( $VertionDatas.Count -ge 4 ){
+		$ReturnData.DisplayVersion = $VertionDatas[3]
+	}
+
 	return $ReturnData
 }
 
@@ -503,7 +513,7 @@ function GetVersionFile($SetVersionFilePath, $SetVersionFileName){
 # Build バージョン 取得
 ##########################################################################
 function GetBuildVersion(){
-	$ReturnData = New-Object PSObject | Select-Object RegistryBuildNumber, WinverBuildNumber, OSVertion, Edition
+	$ReturnData = New-Object PSObject | Select-Object RegistryBuildNumber, WinverBuildNumber, OSVertion, DisplayVersion, Edition
 
 	# ビルド番号詳細
 	$RegPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion"
@@ -539,6 +549,17 @@ function GetBuildVersion(){
 	}
 	else{
 		$ReturnData.OSVertion = $null
+	}
+
+	# Winver の表示バージョン
+	$RegPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion"
+	$RegKey = "DisplayVersion"
+	$DisplayVersion = (Get-ItemProperty $RegPath -name $RegKey -ErrorAction SilentlyContinue).$RegKey
+	if( $DisplayVersion -ne $null ){
+		$ReturnData.DisplayVersion = $DisplayVersion
+	}
+	else{
+		$ReturnData.DisplayVersion = $null
 	}
 
 	# OS のエディション
@@ -583,12 +604,14 @@ function NoticeFinishWU($FilePath, $FileName, $BuildVertion){
 	$RegistryBuildNumber = $BuildVertion.RegistryBuildNumber
 	$WinverBuildNumber = $BuildVertion.WinverBuildNumber
 	$OSVertion = $BuildVertion.OSVertion
+	$DisplayVersion = $BuildVertion.DisplayVersion
 	$OSEdition = $BuildVertion.Edition
 
 	$Message = "Windows Update finish : $HostName`n`r"
 	$Message += "Registry Build Number : $RegistryBuildNumber`n`r"
 	$Message += "Winver Build Number : $WinverBuildNumber`n`r"
 	$Message += "OS Vertion : $OSVertion`n`r"
+	$Message += "DisplayVersion : $DisplayVersion`n`r"
 	$Message += "OS Edition : $OSEdition`n`r"
 
 	[array]$HotFixs = Get-HotFix | sort InstalledOn -Descending
@@ -623,8 +646,8 @@ function FinishWU(){
 
 	# Build バージョン更新確認
 	if( ($LastVertion.RegistryBuildNumber -eq $NowVertion.RegistryBuildNumber) -and
-		($LastVertion.WinverBuildNumber   -eq $NowVertion.WinverBuildNumber) -and
-		($LastVertion.OSVertion           -eq $NowVertion.OSVertion)){
+		($LastVertion.WinverBuildNumber   -eq $NowVertion.WinverBuildNumber)
+		){
 
 		# バージョン更新なし
 		return
