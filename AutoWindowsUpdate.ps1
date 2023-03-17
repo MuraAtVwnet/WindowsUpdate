@@ -92,6 +92,10 @@ $G_RebootTimeStampFileName = "Reboot_TimeStamp.txt"
 # Build Vertion 記録ファイル
 $G_BuildVertionFileName = "Build_Vertion.txt"
 
+# トークンファイル
+$G_TokenFileName = "TokenFile.txt"
+
+
 # 最大適用更新数
 $G_MaxUpdateNumber = 100
 
@@ -374,41 +378,78 @@ function RemoveTimeStampFile($SetTimeStampFilePath, $SetTimeStampFileName){
 }
 
 ##########################################################
+# Slack にメッセージを送る
+##########################################################
+function SendSlackMeaase($Message){
+
+	# トークンファイルの取得
+	$TokenFileFullPath = Join-Path $G_SetTimeStampFilePath $G_TokenFileName
+	if( -not (Test-Path $TokenFileFullPath)){
+		return
+	}
+
+	try{
+		[array]$TokenData = Get-Content -Path $TokenFileFullPath
+	}
+	catch{
+		Log "[FAIL] !!!!!!!! $TokenFileFullPath read error. !!!!!!!!"
+		exit
+	}
+
+	$Token = $TokenData[0]
+
+	$Channel = $TokenData[1]
+	if(( $Token -eq $null ) -or ( $Channel -eq $null )){
+		Log "[ERROR] !!!!!!!! $TokenFileFullPath format error. !!!!!!!!"
+		return
+	}
+
+	$url = "https://slack.com/api/chat.postMessage"
+
+	$body = @{
+		token = $Token
+		channel = $Channel
+		text = $Message
+	}
+	$Dummy = Invoke-RestMethod -Method Post -Uri $url -Body $body
+}
+
+##########################################################
 # Windows Update Reboot を Teames に通知する
 ##########################################################
-function NoticeWU($FilePath, $FileName){
+function NoticeWU(){
 
-	$FileFullPath = Join-Path $FilePath $FileName
+#	$FileFullPath = Join-Path $FilePath $FileName
+#
+#	if( -not (Test-Path $FileFullPath)){
+#		# URI ファイルが無い時は何もしない
+#		Log "URI file not found : $FileFullPath"
+#		return
+#	}
+#
+#	# Web API の URL
+#	[array]$Lines = Get-Content -Path $FileFullPath
+#	if( $Lines.Count -eq 0 ){
+#		# データが入っていない
+#		Log "URI file is empty : $FileFullPath"
+#		return
+#	}
+#	$url = $Lines[0]
+#	if( $url.Length -le 35 ){
+#		# URIが短すぎ
+#		Log "URI data is empty : $FileFullPath"
+#		return
+#	}
 
-	if( -not (Test-Path $FileFullPath)){
-		# URI ファイルが無い時は何もしない
-		Log "URI file not found : $FileFullPath"
-		return
-	}
-
-	# Web API の URL
-	[array]$Lines = Get-Content -Path $FileFullPath
-	if( $Lines.Count -eq 0 ){
-		# データが入っていない
-		Log "URI file is empty : $FileFullPath"
-		return
-	}
-	$url = $Lines[0]
-	if( $url.Length -le 35 ){
-		# URIが短すぎ
-		Log "URI data is empty : $FileFullPath"
-		return
-	}
-
-	# Invoke-RestMethod に渡す Web API の引数を JSON にする
+	# Message
 	$HostName = hostname
+	$Message = "Windows Update reboot now ! : $HostName"
 
-	$body = ConvertTo-JSON @{
-		text = "Windows Update reboot now ! : $HostName"
-	}
+	# Send Message
+	SendSlackMeaase $Message
 
-	# API を叩く
-	Invoke-RestMethod -Method Post -Uri $url -Body $body -ContentType 'application/json'
+#	# API を叩く
+#	Invoke-RestMethod -Method Post -Uri $url -Body $body -ContentType 'application/json'
 }
 
 ##########################################################################
@@ -575,31 +616,31 @@ function GetBuildVersion(){
 ##########################################################
 # Windows Update 完了 を Teames に通知する
 ##########################################################
-function NoticeFinishWU($FilePath, $FileName, $BuildVertion){
+function NoticeFinishWU($BuildVertion){
 
-	$FileFullPath = Join-Path $FilePath $FileName
+#	$FileFullPath = Join-Path $FilePath $FileName
+#
+#	if( -not (Test-Path $FileFullPath)){
+#		# URI ファイルが無い時は何もしない
+#		Log "URI file not found : $FileFullPath"
+#		return
+#	}
+#
+#	# Web API の URL
+#	[array]$Lines = Get-Content -Path $FileFullPath
+#	if( $Lines.Count -eq 0 ){
+#		# データが入っていない
+#		Log "URI file is empty : $FileFullPath"
+#		return
+#	}
+#	$url = $Lines[0]
+#	if( $url.Length -le 35 ){
+#		# URIが短すぎ
+#		Log "URI data is empty : $FileFullPath"
+#		return
+#	}
 
-	if( -not (Test-Path $FileFullPath)){
-		# URI ファイルが無い時は何もしない
-		Log "URI file not found : $FileFullPath"
-		return
-	}
-
-	# Web API の URL
-	[array]$Lines = Get-Content -Path $FileFullPath
-	if( $Lines.Count -eq 0 ){
-		# データが入っていない
-		Log "URI file is empty : $FileFullPath"
-		return
-	}
-	$url = $Lines[0]
-	if( $url.Length -le 35 ){
-		# URIが短すぎ
-		Log "URI data is empty : $FileFullPath"
-		return
-	}
-
-	# Invoke-RestMethod に渡す Web API の引数を JSON にする
+	# Message
 	$HostName = hostname
 	$RegistryBuildNumber = $BuildVertion.RegistryBuildNumber
 	$WinverBuildNumber = $BuildVertion.WinverBuildNumber
@@ -607,12 +648,15 @@ function NoticeFinishWU($FilePath, $FileName, $BuildVertion){
 	$DisplayVersion = $BuildVertion.DisplayVersion
 	$OSEdition = $BuildVertion.Edition
 
-	$Message = "Windows Update finish : $HostName`n`r"
-	$Message += "Registry Build Number : $RegistryBuildNumber`n`r"
-	$Message += "Winver Build Number : $WinverBuildNumber`n`r"
-	$Message += "OS Vertion : $OSVertion`n`r"
-	$Message += "DisplayVersion : $DisplayVersion`n`r"
-	$Message += "OS Edition : $OSEdition`n`r"
+$Meaasege = @"
+Windows Update finish : $HostName
+Registry Build Number : $RegistryBuildNumber
+Winver Build Number : $WinverBuildNumber
+OS Vertion : $OSVertion
+DisplayVersion : $DisplayVersion
+OS Edition : $OSEdition
+
+"@
 
 	[array]$HotFixs = Get-HotFix | sort InstalledOn -Descending
 	foreach($HotFix in $HotFixs){
@@ -626,12 +670,16 @@ function NoticeFinishWU($FilePath, $FileName, $BuildVertion){
 	$MessageLength = $Message.Length -2
 	$Message = $Message.Substring(0, $MessageLength)
 
-	$body = ConvertTo-JSON @{
-		text = $Message
-	}
+	# Send Message
+	SendSlackMeaase $Meaasege
 
-	# API を叩く
-	Invoke-RestMethod -Method Post -Uri $url -Body $body -ContentType 'application/json'
+
+#	$body = ConvertTo-JSON @{
+#		text = $Message
+#	}
+#
+#	# API を叩く
+#	Invoke-RestMethod -Method Post -Uri $url -Body $body -ContentType 'application/json'
 }
 
 ##########################################################
@@ -659,7 +707,7 @@ function FinishWU(){
 		SetVersionFile $G_SetTimeStampFilePath $G_BuildVertionFileName $NowVertion
 
 		# Windows Update 完了 を Teames に通知する
-		NoticeFinishWU $G_SetTimeStampFilePath $G_MicrosoftTeamsUriFileName $NowVertion
+		NoticeFinishWU $NowVertion
 
 		# バージョン情報をログに出力
 		$RegistryBuildNumber = $NowVertion.RegistryBuildNumber
@@ -686,7 +734,7 @@ if (-not(([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
 # Microsoft Teams メッセージ送信テスト
 if( $MessageTest ){
 	Log "Message send test"
-	NoticeWU $G_SetTimeStampFilePath $G_MicrosoftTeamsUriFileName
+	NoticeWU # $G_SetTimeStampFilePath $G_MicrosoftTeamsUriFileName
 	exit
 }
 
@@ -867,7 +915,7 @@ else{
 			sleep 30
 			Log "Reboot system now !!"
 			SetTimeStampFile $G_SetTimeStampFilePath $G_RebootTimeStampFileName
-			NoticeWU $G_SetTimeStampFilePath $G_MicrosoftTeamsUriFileName
+			NoticeWU # $G_SetTimeStampFilePath $G_MicrosoftTeamsUriFileName
 			Restart-Computer -Force
 		}
 		else
