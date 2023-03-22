@@ -380,7 +380,7 @@ function RemoveTimeStampFile($SetTimeStampFilePath, $SetTimeStampFileName){
 ##########################################################
 # Slack にメッセージを送る
 ##########################################################
-function SendSlackMeaase($Message){
+function SendSlackMessage($Message, [string]$Mention){
 
 	# トークンファイルの取得
 	$TokenFileFullPath = Join-Path $G_SetTimeStampFilePath $G_TokenFileName
@@ -405,6 +405,10 @@ function SendSlackMeaase($Message){
 	}
 
 	$url = "https://slack.com/api/chat.postMessage"
+
+	if( $Mention -ne [String]$null){
+		$Message = $Mention + " " + $Message
+	}
 
 	$body = @{
 		token = $Token
@@ -446,7 +450,7 @@ function NoticeWU(){
 	$Message = "Windows Update reboot now ! : $HostName"
 
 	# Send Message
-	SendSlackMeaase $Message
+	SendSlackMessage $Message
 
 #	# API を叩く
 #	Invoke-RestMethod -Method Post -Uri $url -Body $body -ContentType 'application/json'
@@ -658,21 +662,27 @@ OS Edition : $OSEdition
 
 "@
 
+	$KBs = ""
+
 	[array]$HotFixs = Get-HotFix | sort InstalledOn -Descending
 	foreach($HotFix in $HotFixs){
 		$WUDate = ($HotFix.InstalledOn).ToString("yyyy/MM/dd")
 		$KB = $HotFix.HotFixID
 		$KBType = $HotFix.Description
-		$Message += "$WUDate $KB $KBType`n`r"
+		$KBs += "$WUDate $KB $KBType`n`r"
 	}
 
-	# 末尾の CR/LF 削除
-	$MessageLength = $Message.Length -2
-	$Message = $Message.Substring(0, $MessageLength)
+
+	if( $KBs -ne [String]$null ){
+		# 末尾の CR/LF 削除
+		$KBsLength = $KBs.Length -2
+		$KBs = $KBs.Substring(0, $KBs)
+
+		$Meaasege += $KBs
+	}
 
 	# Send Message
-	SendSlackMeaase $Meaasege
-
+	SendSlackMessage $Meaasege
 
 #	$body = ConvertTo-JSON @{
 #		text = $Message
