@@ -672,12 +672,7 @@ OS Edition : $OSEdition
 		$KBs += "$WUDate $KB $KBType`n`r"
 	}
 
-
 	if( $KBs -ne [String]$null ){
-		# 末尾の CR/LF 削除
-		$KBsLength = $KBs.Length -2
-		$KBs = $KBs.Substring(0, $KBs)
-
 		$Meaasege += $KBs
 	}
 
