@@ -669,7 +669,7 @@ OS Edition : $OSEdition
 		$WUDate = ($HotFix.InstalledOn).ToString("yyyy/MM/dd")
 		$KB = $HotFix.HotFixID
 		$KBType = $HotFix.Description
-		$KBs += "$WUDate $KB $KBType`n`r"
+		$KBs += "$WUDate $KB $KBType`n"
 	}
 
 	if( $KBs -ne [String]$null ){
